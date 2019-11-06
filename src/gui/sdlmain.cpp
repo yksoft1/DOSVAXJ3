@@ -2218,8 +2218,8 @@ int main(int argc, char* argv[]) {
 		
 		/* Can't disable the console with debugger enabled */
 #if defined(WIN32) && !(C_DEBUG)
-#ifdef _MSC_VER
-		if (control->cmdline->FindExist("-noconsole")) {
+#if defined (_MSC_VER) || defined (__MINGW32__) 
+		if (control->cmdline->FindExist("-stdio-redirect")) {
 #endif
 			//FreeConsole();
 			/* Redirect standard input and standard output */
@@ -2228,7 +2228,7 @@ int main(int argc, char* argv[]) {
 			freopen(STDERR_FILE, "w", stderr);
 			setvbuf(stdout, NULL, _IOLBF, BUFSIZ);	/* Line buffered */
 			setbuf(stderr, NULL);					/* No buffering */
-#ifdef _MSC_VER
+#if defined (_MSC_VER) || defined (__MINGW32__) 
 		} else if(control->cmdline->FindExist("-console")) {
 			if (AllocConsole()) {
 				fclose(stdin);
