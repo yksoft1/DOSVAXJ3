@@ -89,7 +89,7 @@ static bool LoadFontxFile(const char *fname, int height = 16) {
 	if(*fname=='\0') return false;
 	FILE * mfile=fopen(fname,"rb");
 	if (!mfile) {
-#if defined(LINUX)
+#if defined(LINUX) && !defined (EMSCRIPTEN)
 		char *start = strrchr((char *)fname, '/');
 		if(start != NULL) {
 			char cname[PATH_MAX + 1];
