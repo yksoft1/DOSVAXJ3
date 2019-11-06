@@ -410,6 +410,7 @@ static void DOSBOX_RealInit(Section * sec) {
 			SetGaijiConfig(section);
 			DOSV_SetConfig(section);
 		}
+#ifndef NO_SDLIM
 		if(section->Get_bool("im")) {
 			im_enable_flag = true;
 			SDL_SetIMValues(SDL_IM_ENABLE, 1, NULL);
@@ -417,6 +418,7 @@ static void DOSBOX_RealInit(Section * sec) {
 			im_enable_flag = false;
 			SDL_SetIMValues(SDL_IM_ENABLE, 0, NULL);
 		}
+#endif
 		debug_flag = section->Get_bool("debug");
 	}
 }

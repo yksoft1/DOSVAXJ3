@@ -557,7 +557,9 @@ void SetFontName(const char *name)
 {
 	jfont_name = name;
 #if defined(WIN32)
+#ifndef NO_SDLIM
 	SDL_SetCompositionFontName(jfont_name.c_str());
+#endif
 #endif
 }
 

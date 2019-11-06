@@ -1716,7 +1716,9 @@ bool INT10_SetDOSVModeVtext(Bit16u mode, enum DOSV_VTEXT_MODE vtext_mode)
 		if(cheight == 19) {
 			cheight = 16;
 		}
+#ifndef NO_SDLIM
 		SDL_SetIMValues(SDL_IM_FONT_SIZE, cheight, NULL);
+#endif
 #endif
 	} else {
 		LOG(LOG_INT10, LOG_ERROR)("DOS/V:Trying to set illegal mode %X", mode);

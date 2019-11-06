@@ -27,7 +27,7 @@
 #include "../dos/drives.h"
 #include "mapper.h"
 
-#if defined(WIN32)
+#if defined(WIN32) && !defined (__MINGW32__)
 #define	fseek	_fseeki64
 #endif
 

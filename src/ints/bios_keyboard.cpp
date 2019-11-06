@@ -706,18 +706,26 @@ INT16_Handler(void) {
 		if((IS_J3_ARCH || IS_DOSV) && IS_DOS_JAPANESE) {
 			if(reg_al == 0x00) {
 				if(reg_dl & 0x81) {
+#ifndef NO_SDLIM
 					SDL_SetIMValues(SDL_IM_ONOFF, 1, NULL);
+#endif
 				} else {
+#ifndef NO_SDLIM
 					SDL_SetIMValues(SDL_IM_ONOFF, 0, NULL);
+#endif
 				}
 			} else if(reg_al == 0x01) {
 				int onoff;
 				reg_dl = 0x00;
+#ifndef NO_SDLIM
 				if(SDL_GetIMValues(SDL_IM_ONOFF, &onoff, NULL) == NULL) {
 					if(onoff) {
 						reg_dl = 0x81;
 					}
 				}
+#else
+				reg_dl = 0x81;
+#endif
 			}
 		}
 		break;

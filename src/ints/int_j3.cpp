@@ -191,20 +191,28 @@ Bitu INT6F_Handler(void)
 	case 0x03:
 	case 0x04:
 	case 0x05:
+#ifndef NO_SDLIM
 		SDL_SetIMValues(SDL_IM_ONOFF, 1, NULL);
+#endif
 		break;
 	case 0x0b:
+#ifndef NO_SDLIM
 		SDL_SetIMValues(SDL_IM_ONOFF, 0, NULL);
+#endif
 		break;
 	case 0x66:
 		{
 			int onoff;
 			reg_al = 0x00;
+#ifndef NO_SDLIM
 			if(SDL_GetIMValues(SDL_IM_ONOFF, &onoff, NULL) == NULL) {
 				if(onoff) {
 					reg_al = 0x01;
 				}
 			}
+#else
+			reg_al = 0x01;
+#endif
 		}
 		break;
 	}
@@ -436,6 +444,7 @@ void SetIMPosition()
 		y++;
 #endif
 		Bit8u height = real_readb(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT);
+#ifndef NO_SDLIM
 		if(height == 24) {
 			SDL_SetIMPosition(x * 12, y * 24);
 		} else {
@@ -445,6 +454,7 @@ void SetIMPosition()
 				SDL_SetIMPosition(x * 8, y * height + ((height == 16) ? 0 : 1));
 			}
 		}
+#endif
 	}
 }
 

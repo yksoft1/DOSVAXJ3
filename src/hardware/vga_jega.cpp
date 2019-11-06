@@ -225,6 +225,7 @@ void JEGA_setupAX(void) {
 	jega.RCSKW = 0x20;//de: Cursor Skew control (not implemented)
 	jega.ROMSL = 0x00;//df: Unused?
 	jega.RSTAT = 0x03;//bf: Font register accessible status
+	jega.fontIndex = 0;
 	real_writeb(BIOSMEM_AX_SEG, BIOSMEM_AX_JPNSTATUS, 0);
 	real_writeb(BIOSMEM_AX_SEG, BIOSMEM_AX_JEGA_RMOD1, jega.RMOD1);
 	real_writeb(BIOSMEM_AX_SEG, BIOSMEM_AX_JEGA_RMOD2, jega.RMOD2);

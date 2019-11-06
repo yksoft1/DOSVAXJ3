@@ -1839,6 +1839,7 @@ void GFX_Events() {
 			if (((event.key.keysym.sym == SDLK_TAB )) && (event.key.keysym.mod & KMOD_ALT)) break;
 			// ignore tab events that arrive just after regaining focus. (likely the result of alt-tab)
 			if ((event.key.keysym.sym == SDLK_TAB) && (GetTicks() - sdl.focus_ticks < 2)) break;
+#ifndef NO_SDLIM
 			int onoff;
 			if(SDL_GetIMValues(SDL_IM_ONOFF, &onoff, NULL) == NULL) {
 				if(onoff != 0 && event.type == SDL_KEYDOWN) {
@@ -1880,6 +1881,7 @@ void GFX_Events() {
 					sdl.ime_ticks = GetTicks();
 				}
 			}
+#endif
 #endif
 #if defined (MACOSX)
 		case SDL_KEYDOWN:
@@ -2456,8 +2458,10 @@ int main(int argc, char* argv[]) {
 	sticky_keys(true); //Might not be needed if the shutdown function switches to windowed mode, but it doesn't hurt
 #endif 
 	// DOSVAXJ3
+#ifndef NO_SDLIM
 	SDL_SetIMValues(SDL_IM_ONOFF, 0, NULL);
 	SDL_SetIMValues(SDL_IM_ENABLE, 0, NULL);
+#endif
 	QuitFont();
 
 	//Force visible mouse to end user. Somehow this sometimes doesn't happen

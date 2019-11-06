@@ -33,7 +33,7 @@
 #include "inout.h"
 #include "jega.h"
 
-#if defined(WIN32)
+#if defined(WIN32) && !defined (__MINGW32__)
 #define	fseek	_fseeki64
 #define	ftell	_ftelli64
 #endif
