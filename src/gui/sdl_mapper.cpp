@@ -78,6 +78,10 @@ enum BC_Types {
 #define	SDLK_HANZEN		(SDLKey)(SDLK_LAST+3)	//326
 #define	SDLK_LAST_J		(SDLKey)(SDLK_LAST+4)	//327
 
+#ifdef EMSCRIPTEN
+#define SDLK_WORLD_5 	165
+#endif
+
 class CEvent;
 class CHandlerEvent;
 class CButton;
@@ -510,7 +514,7 @@ Bitu GetKeyCode(SDL_keysym keysym) {
 	/* special handling of Japanese 106-key */
 #if !defined (WIN32) && !defined (MACOSX) && !defined(OS2)
 		/* Linux */
-#if defined(LINUX)
+#if defined(LINUX) && !defined (EMSCRIPTEN)
 		if(keyboard_jp_flag) {
 			if(keysym.sym == 0x5c) {
 				if(keysym.scancode == 0x61) {
@@ -2660,6 +2664,7 @@ void MAPPER_StartUp(Section * sec) {
 
 	usescancodes = false;
 
+#ifndef EMSCRIPTEN
 	if (section->Get_bool("usescancodes")) {
 		usescancodes=true;
 
@@ -2786,6 +2791,7 @@ void MAPPER_StartUp(Section * sec) {
 			if (key<MAX_SDLKEYS) scancode_map[key]=(Bit8u)i;
 		}
 	}
+#endif
 
 	Prop_path* pp = section->Get_path("mapperfile");
 	mapper.filename = pp->realpath;

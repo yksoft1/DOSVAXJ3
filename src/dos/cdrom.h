@@ -84,6 +84,7 @@ public:
 	virtual void	InitNewMedia		(void) {};
 };	
 
+#ifndef EMSCRIPTEN
 class CDROM_Interface_SDL : public CDROM_Interface
 {
 public:
@@ -112,6 +113,7 @@ private:
 	int		driveID;
 	Uint32	oldLeadOut;
 };
+#endif
 
 class CDROM_Interface_Fake : public CDROM_Interface
 {
@@ -377,6 +379,7 @@ private:
 
 #endif /* WIN 32 */
 
+#ifndef EMSCRIPTEN
 #if defined (LINUX) || defined(OS2)
 
 class CDROM_Interface_Ioctl : public CDROM_Interface_SDL
@@ -393,5 +396,20 @@ private:
 };
 
 #endif /* LINUX */
+
+#endif
+
+#ifdef EMSCRIPTEN
+#define CD_FPS	75
+#define FRAMES_TO_MSF(f, M,S,F)	{					\
+	int value = f;							\
+	*(F) = value%CD_FPS;						\
+	value /= CD_FPS;						\
+	*(S) = value%60;						\
+	value /= 60;							\
+	*(M) = value;							\
+}
+#define MSF_TO_FRAMES(M, S, F)	((M)*60*CD_FPS+(S)*CD_FPS+(F))
+#endif
 
 #endif /* __CDROM_INTERFACE__ */

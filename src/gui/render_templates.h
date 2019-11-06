@@ -16,6 +16,11 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+#ifdef EMSCRIPTEN
+// Both Emscripten SDL 1 and 2 use Canvas byte order.
+#define BGR_32BPP
+#endif
+
 #if DBPP == 8
 #define PSIZE 1
 #define PTYPE Bit8u

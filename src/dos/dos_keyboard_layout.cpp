@@ -1260,6 +1260,7 @@ public:
 #endif
 		}
 
+#ifndef EMSCRIPTEN //Don't know why, but it's not working on Emscripten here - yksoft1
 		bool extract_codepage = true;
 		if (wants_dos_codepage>0) {
 			if ((loaded_layout->read_codepage_file("auto", (Bitu)wants_dos_codepage)) == KEYB_NOERROR) {
@@ -1272,7 +1273,7 @@ public:
 			Bitu req_codepage = loaded_layout->extract_codepage(layoutname);
 			loaded_layout->read_codepage_file("auto", req_codepage);
 		}
-
+#endif
 /*		if (strncmp(layoutname,"auto",4) && strncmp(layoutname,"none",4)) {
 			LOG_MSG("Loading DOS keyboard layout %s ...",layoutname);
 		} */

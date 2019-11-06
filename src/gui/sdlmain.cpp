@@ -141,7 +141,9 @@ struct private_hwdata {
 enum SCREEN_TYPES	{
 	SCREEN_SURFACE,
 	SCREEN_SURFACE_DDRAW,
+#ifndef EMSCRIPTEN
 	SCREEN_OVERLAY,
+#endif
 	SCREEN_OPENGL
 };
 
@@ -210,7 +212,9 @@ struct SDL_Block {
 	} priority;
 	SDL_Rect clip;
 	SDL_Surface * surface;
+#ifndef EMSCRIPTEN
 	SDL_Overlay * overlay;
+#endif
 	SDL_cond *cond;
 	struct {
 		bool autolock;
@@ -235,6 +239,10 @@ struct SDL_Block {
 
 static SDL_Block sdl;
 const char *titlebar;
+
+#if defined(EMSCRIPTEN) && !defined(EMTERPRETER_SYNC)
+int emscripten_wait;
+#endif
 
 #define SETMODE_SAVES 1  //Don't set Video Mode if nothing changes.
 #define SETMODE_SAVES_CLEAR 1 //Clear the screen, when the Video Mode is reused
@@ -434,11 +442,13 @@ check_gotbpp:
 		flags|=GFX_SCALING;
 		goto check_gotbpp;
 #endif
+#ifndef EMSCRIPTEN
 	case SCREEN_OVERLAY:
 		if (flags & GFX_RGBONLY || !(flags&GFX_CAN_32)) goto check_surface;
 		flags|=GFX_SCALING;
 		flags&=~(GFX_CAN_8|GFX_CAN_15|GFX_CAN_16);
 		break;
+#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 		if (flags & GFX_RGBONLY || !(flags&GFX_CAN_32)) goto check_surface;
@@ -672,6 +682,7 @@ dosurface:
 		sdl.desktop.type=SCREEN_SURFACE_DDRAW;
 		break;
 #endif
+#ifndef EMSCRIPTEN
 	case SCREEN_OVERLAY:
 		if (sdl.overlay) {
 			SDL_FreeYUVOverlay(sdl.overlay);
@@ -687,6 +698,7 @@ dosurface:
 		sdl.desktop.type=SCREEN_OVERLAY;
 		retFlags = GFX_CAN_32 | GFX_SCALING | GFX_HARDWARE;
 		break;
+#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 	{
@@ -919,12 +931,14 @@ bool GFX_StartUpdate(Bit8u * & pixels,Bitu & pitch) {
 		sdl.updating=true;
 		return true;
 #endif
+#ifndef EMSCRIPTEN
 	case SCREEN_OVERLAY:
 		if (SDL_LockYUVOverlay(sdl.overlay)) return false;
 		pixels=(Bit8u *)*(sdl.overlay->pixels);
 		pitch=*(sdl.overlay->pitches);
 		sdl.updating=true;
 		return true;
+#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 		if(sdl.opengl.pixel_buffer_object) {
@@ -1005,10 +1019,12 @@ void GFX_EndUpdate( const Bit16u *changedLines ) {
 		SDL_Flip(sdl.surface);
 		break;
 #endif
+#ifndef EMSCRIPTEN
 	case SCREEN_OVERLAY:
 		SDL_UnlockYUVOverlay(sdl.overlay);
 		SDL_DisplayYUVOverlay(sdl.overlay,&sdl.clip);
 		break;
+#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 		if (sdl.opengl.pixel_buffer_object) {
@@ -1065,6 +1081,7 @@ Bitu GFX_GetRGB(Bit8u red,Bit8u green,Bit8u blue) {
 	case SCREEN_SURFACE:
 	case SCREEN_SURFACE_DDRAW:
 		return SDL_MapRGB(sdl.surface->format,red,green,blue);
+#ifndef EMSCRIPTEN
 	case SCREEN_OVERLAY:
 		{
 			Bit8u y =  ( 9797*(red) + 19237*(green) +  3734*(blue) ) >> 15;
@@ -1076,6 +1093,7 @@ Bitu GFX_GetRGB(Bit8u red,Bit8u green,Bit8u blue) {
 			return (u << 0) | (y << 8) | (v << 16) | (y << 24);
 #endif
 		}
+#endif
 	case SCREEN_OPENGL:
 //		return ((red << 0) | (green << 8) | (blue << 16)) | (255 << 24);
 		//USE BGRA
@@ -1303,8 +1321,10 @@ static void GUI_StartUp(Section * sec) {
 	} else if (output == "ddraw") {
 		sdl.desktop.want_type=SCREEN_SURFACE_DDRAW;
 #endif
+#ifndef EMSCRIPTEN
 	} else if (output == "overlay") {
 		sdl.desktop.want_type=SCREEN_OVERLAY;
+#endif
 #if C_OPENGL
 	} else if (output == "opengl") {
 		sdl.desktop.want_type=SCREEN_OPENGL;
@@ -1317,8 +1337,9 @@ static void GUI_StartUp(Section * sec) {
 		LOG_MSG("SDL: Unsupported output device %s, switching back to surface",output.c_str());
 		sdl.desktop.want_type=SCREEN_SURFACE;//SHOULDN'T BE POSSIBLE anymore
 	}
-
+#ifndef EMSCRIPTEN
 	sdl.overlay=0;
+#endif
 #if C_OPENGL
    if(sdl.desktop.want_type==SCREEN_OPENGL){ /* OPENGL is requested */
 	sdl.surface=SDL_SetVideoMode_Wrap(640,400,0,SDL_OPENGL);
@@ -1792,7 +1813,7 @@ void GFX_Events() {
 		case SDL_VIDEOEXPOSE:
 			if (sdl.draw.callback) sdl.draw.callback( GFX_CallBackRedraw );
 			break;
-#if defined(LINUX)
+#if defined(LINUX) && !defined (EMSCRIPTEN)
 		case SDL_KEYUP:
 		case SDL_KEYDOWN:
 			if (event.key.keysym.sym==SDLK_LALT) sdl.laltstate = event.key.type;
@@ -1968,7 +1989,10 @@ void Config_Add_SDL() {
 	                  "  (output=surface does not!)");
 
 	const char* outputs[] = {
-		"surface", "overlay",
+		"surface",
+#ifndef EMSCRIPTEN
+		"overlay",
+#endif
 #if C_OPENGL
 		"opengl", "openglnb",
 #endif
@@ -2284,6 +2308,13 @@ int main(int argc, char* argv[]) {
 	LOG_MSG("Long File Name (LFN), mouse copy/paste and other support, by Wengier,2014-2017.");
 	LOG_MSG("---");
 
+#if defined(EMSCRIPTEN) && !defined(EMTERPRETER_SYNC)
+	Section_prop * sdl_dosbox=static_cast<Section_prop *>(control->GetSection("dosbox"));
+	emscripten_wait=sdl_dosbox->Get_int("emscripten_wait");
+	
+	LOG_MSG("Loaded emscripten_wait = %d", emscripten_wait);
+#endif	
+
 	/* Init SDL */
 #if SDL_VERSION_ATLEAST(1, 2, 14)
 	/* Or debian/ubuntu with older libsdl version as they have done this themselves, but then differently.
@@ -2292,7 +2323,10 @@ int main(int argc, char* argv[]) {
 	 */
 	putenv(const_cast<char*>("SDL_DISABLE_LOCK_KEYS=1"));
 #endif
-	if ( SDL_Init( SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_CDROM
+	if ( SDL_Init( SDL_INIT_AUDIO|SDL_INIT_VIDEO
+#ifndef EMSCRIPTEN	
+		|SDL_INIT_TIMER|SDL_INIT_CDROM
+#endif
 		|SDL_INIT_NOPARACHUTE
 		) < 0 ) E_Exit("Can't init SDL %s",SDL_GetError());
 	sdl.inited = true;

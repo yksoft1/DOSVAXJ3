@@ -26,6 +26,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#define SDL_TICKS_PASSED(A, B)  ((Sint32)((B) - (A)) <= 0)
+#endif
 #include "dosbox.h"
 #include "debug.h"
 #include "cpu.h"
@@ -140,8 +144,50 @@ Bit32u ticksScheduled;
 bool ticksLocked;
 void increaseticks();
 
+#ifdef EMSCRIPTEN
+int ticksEntry;
+#ifdef EMTERPRETER_SYNC
+int nosleep_lock = 0;
+Bitu last_sleep = 0;
+#else
+static int runcount = 0;
+#endif
+void em_exit(int exitarg);
+static int CPU_Cycles_FromUsage;
+#endif
+
 static Bitu Normal_Loop(void) {
 	Bits ret;
+#ifdef EMSCRIPTEN
+	ticksEntry = GetTicks();
+#ifdef EMTERPRETER_SYNC
+	/* Normal DOSBox is free to use up all available host CPU time, but
+	 * in a browser, sleep has to happen regularly so the screen is updated,
+	 * sound isn't interrupted, and the script does not appear to hang.
+	 */ 
+	static Bitu last_loop = 0;
+	if (SDL_TICKS_PASSED(ticksEntry, last_sleep + 10)) {
+		if (nosleep_lock == 0) {
+			last_sleep = ticksEntry;
+			emscripten_sleep_with_yield(1);
+			ticksEntry = GetTicks();
+		} else if (SDL_TICKS_PASSED(ticksEntry, last_sleep + 2000) &&
+		           !SDL_TICKS_PASSED(ticksEntry, last_loop + 200)) {
+			/* Emterpreter makes code much slower, so the CPU interpreter does
+			 * not use it. That means it must not be interrupted using
+			 * emscripten_sleep(). Normally, CPU interpreter recursion should
+			 * only involve brief CPU exceptions, so this should not be
+			 * triggered. Sometimes DOSBox fails to detect return from
+			 * exception. Timeout must not be triggered when the browser is
+			 * running slow overall or the page is in the background.
+			 */
+			LOG_MSG("Emulation aborted due to nested emulation timeout.");
+			em_exit(1);
+		}
+	}
+	last_loop = ticksEntry;
+#endif
+#endif
 	while (1) {
 		if (PIC_RunQueue()) {
 			ret = (*cpudecoder)();
@@ -165,7 +211,15 @@ static Bitu Normal_Loop(void) {
 }
 
 //For trying other delays
+#ifndef EMSCRIPTEN
 #define wrap_delay(a) SDL_Delay(a)
+#else
+#ifdef EMTERPRETER_SYNC
+#define wrap_delay(a) emscripten_sleep_with_yield(a)
+#else
+#define wrap_delay(a)
+#endif
+#endif
 
 void increaseticks() { //Make it return ticksRemain and set it in the function above to remove the global variable.
 	if (GCC_UNLIKELY(ticksLocked)) { // For Fast Forward Mode
@@ -177,7 +231,32 @@ void increaseticks() { //Make it return ticksRemain and set it in the function a
 		ticksScheduled = 0;
 		return;
 	}
-	
+
+/*** CPU cycle adjustment algorithm configuration ***/
+#ifdef EMSCRIPTEN
+// This only includes CPU usage during the main loop. Other Emscripten code
+// plus the browser also require CPU time. Low values don't take full
+// advantage of the host CPU and decrease emulation performance. High values
+// cause tick limits to be hit more often and disrupt sound.
+// Over 60 increases sound interruptions in Firefox 34 in Linux.
+// Up to 80 delivers results which aren't too bad.
+#define CPU_USAGE_TARGET 60
+// Exceeding the soft limit will case immediate cutback or
+// recalculation of CPU_CycleMax.
+#define SOFT_TICK_LIMIT 18
+// Exceeding the hard limit causes emulation to slow down compared to real
+// time. Occasional spikes triggering this are unavoidable in a browser.
+// Missed ticks are added to the backlog in an attempt to catch up later.
+#define HARD_TICK_LIMIT 25
+// The backlog cannot be allowed to grow without bound.
+#define BACKLOG_LIMIT 50
+#else
+#define CPU_USAGE_TARGET 90
+#define SOFT_TICK_LIMIT 15
+#define HARD_TICK_LIMIT 20
+#define BACKLOG_LIMIT 40
+#endif
+
 	static Bit32s lastsleepDone = -1;
 	static Bitu sleep1count = 0;
 
@@ -188,7 +267,14 @@ void increaseticks() { //Make it return ticksRemain and set it in the function a
 		ticksAdded = 0;
 
 		if (!CPU_CycleAutoAdjust || CPU_SkipCycleAutoAdjust || sleep1count < 3) {
+#ifndef EMSCRIPTEN
 			wrap_delay(1);
+#elif defined(EMTERPRETER_SYNC)
+			if (nosleep_lock == 0) {
+				last_sleep = ticksNew;
+				wrap_delay(1);
+			}
+#endif
 		} else {
 			/* Certain configurations always give an exact sleepingtime of 1, this causes problems due to the fact that
 			   dosbox keeps track of full blocks.
@@ -223,11 +309,20 @@ void increaseticks() { //Make it return ticksRemain and set it in the function a
 	//TicksNew > ticksLast
 	ticksRemain = ticksNew-ticksLast;
 	ticksLast = ticksNew;
+#ifdef EMSCRIPTEN
+	/* Calculations below are meant to be based on the number of ticks
+	 * used by DOSBox. Ticks between two main loop calls include time
+	 * when DOSBox isn't running, so only time from the start of this
+	 * function is considered.
+	 */
+	ticksDone += ticksNew - ticksEntry;
+#else
 	ticksDone += ticksRemain;
-	if ( ticksRemain > 20 ) {
+#endif
+//	if ( ticksRemain > 20 ) {
 //		LOG(LOG_MISC,LOG_ERROR)("large remain %d",ticksRemain);
-		ticksRemain = 20;
-	}
+//		ticksRemain = 20;
+//	}
 	ticksAdded = ticksRemain;
 
 	// Is the system in auto cycle mode guessing ? If not just exit. (It can be temporary disabled)
@@ -324,7 +419,53 @@ void DOSBOX_SetNormalLoop() {
 	loop=Normal_Loop;
 }
 
+#ifdef EMSCRIPTEN
+/* Many DOS games display a text mode screen after they exit.
+ * This tries to ensure that screen will be visible. In other situations
+ * this is used to display the screen to help diagnosis.
+ */
+#ifndef EMTERPRETER_SYNC
+extern int emscripten_wait;
+#endif
+static int em_exitarg;
+static void em_exit_loop(void) {
+	static int counter = 0;
+	if (++counter < 500) {
+		PIC_RunQueue();
+		TIMER_AddTick();
+	} else {
+		emscripten_cancel_main_loop();
+		emscripten_force_exit(em_exitarg);
+	}
+}
+
+void em_exit(int exitarg) {
+	em_exitarg = exitarg;
+	emscripten_cancel_main_loop();
+	emscripten_set_main_loop(em_exit_loop, 100, 1);
+}
+
+static void em_main_loop(void) {
+	if ((*loop)()) {
+		/* Here, the function which called emscripten_set_main_loop() should
+		 * return, but that call stack is gone, so emulation ends.
+		 */
+		LOG_MSG("Emulation ended because program exited.");
+		em_exit(0);
+	}
+}
+#endif
+
 void DOSBOX_RunMachine(void){
+#if defined(EMSCRIPTEN) && !defined(EMTERPRETER_SYNC)
+	if (runcount < emscripten_wait) {
+		LOG_MSG("emscripten_wait = %d", emscripten_wait);
+		runcount++;		
+	} else if (runcount == emscripten_wait) {
+		runcount++;
+		emscripten_set_main_loop(em_main_loop, 100, 1);
+	}
+#endif
 	Bitu ret;
 	do {
 		ret=(*loop)();
@@ -517,6 +658,13 @@ void DOSBOX_Init(void) {
 
 	Pbool = secprop->Add_bool("debug",Property::Changeable::OnlyAtStart,false);
 	Pbool->Set_help("debug flag");
+
+#if defined(EMSCRIPTEN) && !defined(EMTERPRETER_SYNC)
+	Pint = secprop->Add_int("emscripten_wait",Property::Changeable::Always,1);
+	Pint->SetMinMax(1,10000);
+	Pint->Set_help("How many runs DOSBox waits before creating Emscripten main loop.\n"
+					"For most situations it should not be set above 2.");
+#endif
 
 #if C_DEBUG	
 	LOG_StartUp();
