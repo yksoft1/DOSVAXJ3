@@ -17,7 +17,7 @@
  */
 
 
-#if defined (WIN32)
+#if defined(WIN32) 
 
 #include <ctype.h>
 
@@ -29,9 +29,9 @@
 #include "wnaspi32.h"
 
 #if defined (_MSC_VER)
+#include <winioctl.h>			// Ioctl stuff
 #include <ntddcdrm.h>			// Ioctl stuff
 #include <ntddscsi.h>
-#include <winioctl.h>			// Ioctl stuff
 #elif (defined __MINGW64_VERSION_MAJOR)
 #include <winioctl.h>			// Ioctl stuff
 #include <ntddcdrm.h>			// Ioctl stuff
