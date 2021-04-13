@@ -27,7 +27,7 @@ CFLAGS	+=	$(shell sdl-config --cflags)
 
 LFLAGS	=
 
-TARGET	=	dosbox.exe
+TARGET	=	dosboxj.exe
 
 CPPSRCS	=	$(DBX_PATH)/src/dosbox.cpp \
 			$(wildcard $(DBX_PATH)/src/aviwriter/*.cpp) \

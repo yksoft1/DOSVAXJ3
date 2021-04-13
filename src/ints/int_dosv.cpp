@@ -178,11 +178,16 @@ static Bitu mskanji_api(void)
 	} else if(func == 5) {
 		if(mode & 0x8000) {
 			if(mode & 0x0001) {
+#ifndef NO_SDLIM
 				SDL_SetIMValues(SDL_IM_ONOFF, 0, NULL);
+#endif
 			} else if(mode & 0x0002) {
+#ifndef NO_SDLIM
 				SDL_SetIMValues(SDL_IM_ONOFF, 1, NULL);
+#endif
 			}
 		} else {
+#ifndef NO_SDLIM
 			int onoff;
 			if(SDL_GetIMValues(SDL_IM_ONOFF, &onoff, NULL) == NULL) {
 				if(onoff) {
@@ -191,6 +196,9 @@ static Bitu mskanji_api(void)
 					real_writew(param_seg, param_off + 2, 0x0009);
 				}
 			}
+#else
+			real_writew(param_seg, param_off + 2, 0x0009);
+#endif
 		}
 		reg_ax = 0;
 	}
